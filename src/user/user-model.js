@@ -1,0 +1,49 @@
+import { model } from "../db.js";
+import { registerNotificationEvents } from "../notify.js";
+import mongoose from "mongoose";
+
+// name
+const modelName = "User";
+
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    age: { type: Number, required: true },
+    avatarUrl: { type: String },
+    parentEmail: { type: String, sparse: true },
+    parentPhone: { type: String },
+    password: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    lastLogin: { type: Date },
+    dailyUsage: [{
+      date: Date,
+      totalTimeSpentMinutes: Number,
+      sessionsCount: Number
+    }],
+    areasProgress: {
+      occupationalTherapy: {
+        difficultyLevel: {type: Number, default: 1},
+        overallScore: { type: Number, default: 0 },
+        exercisesCompleted: { type: Number, default: 0 },
+        averageScore: { type: Number, default: 0 },
+        lastActivity: Date
+      },
+      speechTherapy: {
+        difficultyLevel: {type: Number, default: 1},
+        overallScore: { type: Number, default: 0 },
+        exercisesCompleted: { type: Number, default: 0 },
+        averageScore: { type: Number, default: 0 },
+        lastActivity: Date
+      },
+      cognitive: {
+        difficultyLevel: {type: Number, default: 1},
+        overallScore: { type: Number, default: 0 },
+        exercisesCompleted: { type: Number, default: 0 },
+        averageScore: { type: Number, default: 0 },
+        lastActivity: Date
+      }
+    }
+  });
+
+  registerNotificationEvents(modelName, userSchema)
+
+  export const User = model(modelName, userSchema);
