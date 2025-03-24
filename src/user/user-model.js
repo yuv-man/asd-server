@@ -14,20 +14,23 @@ const userSchema = new mongoose.Schema({
     password: { type: String },
     createdAt: { type: Date, default: Date.now },
     lastLogin: { type: Date },
+    language: { type: String, default: "en" },
     dailyUsage: [{
       date: Date,
       totalTimeSpentMinutes: Number,
       sessionsCount: Number
     }],
     areasProgress: {
-      occupationalTherapy: {
+      ot: {
+        enabled: { type: Boolean, default: true },
         difficultyLevel: {type: Number, default: 1},
         overallScore: { type: Number, default: 0 },
         exercisesCompleted: { type: Number, default: 0 },
         averageScore: { type: Number, default: 0 },
         lastActivity: Date
       },
-      speechTherapy: {
+      speech: {
+        enabled: { type: Boolean, default: true },
         difficultyLevel: {type: Number, default: 1},
         overallScore: { type: Number, default: 0 },
         exercisesCompleted: { type: Number, default: 0 },
@@ -35,6 +38,7 @@ const userSchema = new mongoose.Schema({
         lastActivity: Date
       },
       cognitive: {
+        enabled: { type: Boolean, default: true },
         difficultyLevel: {type: Number, default: 1},
         overallScore: { type: Number, default: 0 },
         exercisesCompleted: { type: Number, default: 0 },

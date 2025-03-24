@@ -1,4 +1,4 @@
-import { model, ObjectId } from "../db.js";
+import { model } from "../db.js";
 import { registerNotificationEvents } from "../notify.js";
 import mongoose from "mongoose";
 // name
@@ -11,11 +11,6 @@ const exerciseAttemptSchema = new mongoose.Schema({
     endTime: Date,
     difficultyLevel: { type: Number, required: true },
     score: Number,
-    completionStatus: {
-      type: String,
-      enum: ["completed", "abandoned", "timed_out"],
-      default: "completed"
-    },
     area: {
       type: String,
       required: true,
@@ -26,7 +21,6 @@ const exerciseAttemptSchema = new mongoose.Schema({
       timeSpentSeconds: Number,
       attemptsCount: Number,
       accuracy: Number,
-      detailedResults: mongoose.Schema.Types.Mixed
     },
     notes: String
   });

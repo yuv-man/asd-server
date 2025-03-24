@@ -5,6 +5,7 @@ import { io } from "../server.js";
 import { ExerciseAttempt } from "../exerciseAttempts/exerciseAttempts-model.js";
 import { User } from "../user/user-model.js";
 import { DailySummary } from "../dailySummary/dailySummary-model.js";
+import { WeeklySummary } from "../weeklySummary/weeklySummary-model.js";
 const router = express.Router();
 const BASE_PATH = "/api/exercises";
 const SESSION_LENGTH = 3
@@ -40,10 +41,10 @@ router
   .get(async (req, res, next) => {
     try {
       // Get areas from query params, default to all areas if none specified
-      const areas = req.query.areas ? req.query.areas.split(',') : ["occupationalTherapy", "speechTherapy", "cognitive"];
+      const areas = req.query.areas ? req.query.areas.split(',') : ["ot", "speech", "cognitive"];
       
       // Validate areas
-      const validAreas = ["occupationalTherapy", "speechTherapy", "cognitive"];
+      const validAreas = ["ot", "speech", "cognitive"];
       const filteredAreas = areas.filter(area => validAreas.includes(area.toLowerCase()));
       
       if (filteredAreas.length === 0) {
@@ -55,13 +56,10 @@ router
 
       // Aggregate pipeline to get random exercises from each area
       const exercises = await Exercise.aggregate([
-        // Match exercises from specified areas
         { $match: { area: { $in: filteredAreas } } },
-        // Add a random field for sorting
-        { $addFields: { random: { $rand: {} } } },
-        // Sort by random value
-        { $sort: { random: 1 } },
-        // Group by area
+        // Sample random documents from each area
+        { $sample: { size: exercisesPerArea * filteredAreas.length } },
+        // Group by area to ensure we have exercises from each area
         { $group: { 
           _id: '$area',
           exercises: { $push: '$$ROOT' }
@@ -70,16 +68,16 @@ router
         { $project: {
           exercises: { $slice: ['$exercises', exercisesPerArea] }
         }},
-        // Unwind the exercises array to flatten the results
         { $unwind: '$exercises' },
-        // Return only the exercise fields
         { $replaceRoot: { newRoot: '$exercises' } }
       ]);
 
-      // Ensure we only return SESSION_LENGTH total exercises
-      const limitedExercises = exercises.slice(0, SESSION_LENGTH);
+      // Shuffle the final results before limiting
+      const shuffledExercises = exercises
+        .sort(() => Math.random() - 0.5)
+        .slice(0, SESSION_LENGTH);
 
-      res.json(limitedExercises);
+      res.json(shuffledExercises);
     } catch (error) {
       console.error('Error fetching exercises by areas:', error);
       next(error);
@@ -124,29 +122,33 @@ router
       .catch(next);
   });
 
-router.post(`${BASE_PATH}/attempt`, authenticateToken, async (req, res, next) => {
+router.post(`${BASE_PATH}/attempt`, async (req, res, next) => {
   try {
-    const { exerciseId, difficultyLevel, score, area, isTest, metrics, completionStatus, endTime } = req.body;
+    const { userId, exerciseId, difficultyLevel, score, area, isTest, startTime, endTime, completionStatus='completed' } = req.body;
+    
+    // Convert string timestamps to Date objects if they aren't already
+    const start = new Date(startTime);
+    const end = endTime ? new Date(endTime) : new Date();
     
     // Create new attempt
     const newAttempt = new ExerciseAttempt({
-      userId: req.user.id,
+      userId: userId,
       exerciseId,
       difficultyLevel,
       score,
       area,
       isTest,
-      metrics,
-      completionStatus,
-      endTime: endTime || new Date()
+      metrics: {},
+      startTime: start,
+      endTime: end
     });
     
     await newAttempt.save();
     
     // Update user area progress
-    const user = await User.findById(req.user.id);
+    const user = await User.findById(userId);
     
-    if (user && completionStatus === 'completed') {
+    if (user) {
       // Update area-specific stats
       const areaStats = user.areasProgress[area];
       const oldTotal = areaStats.overallScore * areaStats.exercisesCompleted;
@@ -159,9 +161,15 @@ router.post(`${BASE_PATH}/attempt`, authenticateToken, async (req, res, next) =>
       // Update or create daily summary
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
+      const currentDayOfWeek = today.getDay();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - currentDayOfWeek);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 7);
       
       let dailySummary = await DailySummary.findOne({
-        userId: req.user.id,
+        userId: userId,
         date: {
           $gte: today,
           $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
@@ -170,34 +178,63 @@ router.post(`${BASE_PATH}/attempt`, authenticateToken, async (req, res, next) =>
       
       if (!dailySummary) {
         dailySummary = new DailySummary({
-          userId: req.user.id,
+          userId: userId,
           date: today
         });
       }
+
+      // Update weekly summary
+      let weeklySummary = await WeeklySummary.findOne({
+        userId: userId,
+        date: {
+          $gte: startOfWeek,
+          $lt: endOfWeek
+        }
+      });
+
+      if (!weeklySummary) {
+        weeklySummary = new WeeklySummary({
+          userId: userId,
+          date: today
+        }); 
+      }
       
       // Update summary stats
-      const timeSpent = (metrics?.timeSpentSeconds || 0) / 60; // Convert to minutes
+      const timeSpent = (end - start) / (1000 * 60); // Convert milliseconds to minutes
       dailySummary.totalTimeSpentMinutes += timeSpent;
       dailySummary.exerciseAttempts += 1;
+      weeklySummary.totalTimeSpentMinutes += timeSpent;
+      weeklySummary.exerciseAttempts += 1;
       
-      if (completionStatus === 'completed') {
-        dailySummary.exercisesCompleted += 1;
-      }
+      
+      dailySummary.exercisesCompleted += 1;
+      weeklySummary.exercisesCompleted += 1;
+      
       
       // Update area-specific stats in daily summary
       const areaSummary = dailySummary.areaBreakdown[area];
       areaSummary.timeSpentMinutes += timeSpent;
       
-      if (completionStatus === 'completed') {
-        const oldAvg = areaSummary.averageScore * areaSummary.exercisesCompleted || 0;
-        areaSummary.exercisesCompleted += 1;
-        areaSummary.averageScore = (oldAvg + score) / areaSummary.exercisesCompleted;
-      }
+      
+      const oldAvgDaily = areaSummary.averageScore * areaSummary.exercisesCompleted || 0;
+      areaSummary.exercisesCompleted += 1;
+      areaSummary.averageScore = (oldAvgDaily + score) / areaSummary.exercisesCompleted;
+      
       
       // Add to recent exercises
       const exercise = await Exercise.findById(exerciseId);
       if (exercise) {
         dailySummary.recentExercises.push({
+          exerciseId,
+          title: exercise.title,
+          area,
+          difficultyLevel,
+          score,
+          timestamp: new Date()
+        });
+
+        // Update weekly summary
+        weeklySummary.recentExercises.push({
           exerciseId,
           title: exercise.title,
           area,
@@ -211,12 +248,27 @@ router.post(`${BASE_PATH}/attempt`, authenticateToken, async (req, res, next) =>
           dailySummary.recentExercises.sort((a, b) => b.timestamp - a.timestamp);
           dailySummary.recentExercises = dailySummary.recentExercises.slice(0, 10);
         }
+
+        if (weeklySummary.recentExercises.length > 20) {
+          weeklySummary.recentExercises.sort((a, b) => b.timestamp - a.timestamp);
+          weeklySummary.recentExercises = weeklySummary.recentExercises.slice(0, 10);
+        }
       }
+
+      // Update area-specific stats in weekly summary
+      const weeklyAreaSummary = weeklySummary.areaBreakdown[area];
+      weeklyAreaSummary.timeSpentMinutes += timeSpent;
+      
+      const oldAvgWeekly = weeklyAreaSummary.averageScore * weeklyAreaSummary.exercisesCompleted || 0;
+      weeklyAreaSummary.exercisesCompleted += 1;
+      weeklyAreaSummary.averageScore = (oldAvgWeekly + score) / weeklyAreaSummary.exercisesCompleted;
+      
       
       await dailySummary.save();
-      
+      await weeklySummary.save();
+
       // Emit real-time update through Socket.IO
-      io.to(req.user.id).emit('exercise-completed', {
+      io.to(userId).emit('exercise-completed', {
         exerciseId,
         score,
         area

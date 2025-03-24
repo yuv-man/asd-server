@@ -3,9 +3,9 @@ import { registerNotificationEvents } from "../notify.js";
 import mongoose from "mongoose";
 
 // name
-const modelName = "DailySummary";
+const modelName = "weeklySummary";
 
-const dailySummarySchema = new mongoose.Schema({
+const weeklySummarySchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     date: { type: Date, required: true },
     totalTimeSpentMinutes: { type: Number, default: 0 },
@@ -38,6 +38,6 @@ const dailySummarySchema = new mongoose.Schema({
     }]
   });
 
-  registerNotificationEvents(modelName, dailySummarySchema)
+  registerNotificationEvents(modelName, weeklySummarySchema)
 
-  export const DailySummary = model(modelName, dailySummarySchema);
+  export const WeeklySummary = model(modelName, weeklySummarySchema);

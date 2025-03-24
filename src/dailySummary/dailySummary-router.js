@@ -41,11 +41,18 @@ router
   });
 
 router
-  .route(`${BASE_PATH}/user/:userId/recent`)
-  //get last 7 days daily summaries for a user
+  .route(`${BASE_PATH}/user/recent/:userId`)
+  //get last week daily summaries for a user
   .get((req, res, next) => {
-    DailySummary.find({ userId: req.params.userId })
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    DailySummary.find({
+      userId: req.params.userId,
+      date: { $gte: lastWeek },
+    })
       .lean()
+      .sort({ date: -1 })
       .then((dailySummaries) => res.send(dailySummaries))
       .catch(next);
   });

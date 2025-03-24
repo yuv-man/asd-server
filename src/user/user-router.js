@@ -10,7 +10,7 @@ router
   // create new
   .post((req, res, next) => {
     User.create(req.body)
-      .then((user) => res.send({id: user._id, name: user.name, age: user.age, avatarUrl: user.avatarUrl}))
+      .then((user) => res.send(user))
       .catch(next);
   });
 
@@ -29,10 +29,10 @@ router
       .catch(next);
   })
   // update
-  .put(authenticateToken, (req, res, next) => {
-    if (req.params.id !== req.user.id) {
-      return res.status(403).send({ message: 'Not authorized to modify this profile' });
-    }
+  .put((req, res, next) => {
+    // if (req.params.id !== req.user.id) {
+    //   return res.status(403).send({ message: 'Not authorized to modify this profile' });
+    // }
     User.findByIdAndUpdate(req.params.id, req.body, { new: true })
       .lean()
       .select('-password')
