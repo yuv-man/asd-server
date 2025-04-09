@@ -8,29 +8,57 @@ const router = express.Router();
 // Register endpoint
 router.post('/register', async (req, res) => {
   try {
-    const { name, age, parentEmail, parentPhone, password } = req.body;
+    const { name,
+      age,
+      avatarUrl,
+      lastLogin,
+      language,
+      googleAuth,
+      authProviderId,
+      email,
+      dailyUsage,
+      areasProgress,
+      authProvider } = req.body;
     
     // Check if user already exists
-    const existingUser = await User.findOne({ name });
+    const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email' });
     }
     
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
-    // Create new user
+    // Create new user without password
     const newUser = new User({
       name,
       age,
-      parentEmail,
+      email,
       parentPhone,
-      password: hashedPassword
+      avatarUrl,
+      lastLogin,
+      language,
+      googleAuth,
+      authProviderId,
+      dailyUsage,
+      areasProgress
     });
     
     await newUser.save();
     
-    res.status(201).json({ message: 'User registered successfully' });
+    // Generate JWT token for the new user
+    const token = jwt.sign(
+      { id: newUser._id, email: newUser.email },
+      process.env.JWT_SECRET || 'your_jwt_secret',
+      { expiresIn: '7d' }
+    );
+    
+    res.status(201).json({ 
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email
+      }
+    });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error during registration' });
@@ -40,10 +68,10 @@ router.post('/register', async (req, res) => {
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email } = req.body;
     
     // Find user
-    const user = await User.findOne({ parentEmail: email });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
@@ -60,7 +88,7 @@ router.post('/login', async (req, res) => {
     
     // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, email: user.parentEmail },
+      { id: user._id, email: user.email },
       process.env.JWT_SECRET || 'your_jwt_secret',
       { expiresIn: '7d' }
     );
@@ -76,9 +104,8 @@ router.post('/login', async (req, res) => {
       message: 'Login successful',
       user: {
         id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.parentEmail
+        name: user.name,
+        email: user.email
       }
     });
   } catch (error) {
@@ -115,9 +142,8 @@ router.get('/check-auth', async (req, res) => {
       isAuthenticated: true,
       user: {
         id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.parentEmail
+        name: user.name,
+        email: user.email
       }
     });
   } catch (error) {
@@ -126,4 +152,58 @@ router.get('/check-auth', async (req, res) => {
   }
 });
 
-export default router; 
+// User sync endpoint for NextAuth.js OAuth
+router.post('/users/sync', async (req, res) => {
+  try {
+    const { email, name, providerId, provider } = req.body;
+
+    if (!email || !providerId || !provider) {
+      return res.status(400).json({ message: 'Missing required user information' });
+    }
+
+    // Find user by parentEmail (assuming OAuth uses parent's email)
+    let user = await User.findOne({ email: email });
+
+    if (user) {
+      // Update existing user
+      user.provider = provider;
+      user.providerId = providerId;
+      user.lastLogin = new Date();
+
+      await user.save();
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { id: user._id, email: user.email },
+        process.env.JWT_SECRET || 'your_jwt_secret',
+        { expiresIn: '7d' }
+      );
+
+      return res.json({
+        success: true,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          isExistingUser: true
+        },
+        token
+      });
+    } else {
+      // User not found, return success but indicate it's a new user
+      return res.json({
+        success: true,
+        user: {
+          email,
+          name,
+          isExistingUser: false
+        }
+      });
+    }
+  } catch (error) {
+    console.error('User sync error:', error);
+    res.status(500).json({ message: 'Server error during user sync' });
+  }
+});
+
+export default router;

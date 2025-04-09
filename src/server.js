@@ -12,9 +12,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-
-import { Exercise } from './exercise/exercise-model.js';
-// Authentication
+import { errorHandler } from './utils/errorHandler.js';
 
 import initializeSocket from './socket/socket-handler.js';
 
@@ -49,23 +47,9 @@ class Server {
     this.app.use(express.urlencoded({ extended: true }));
     this.app.use(cookieParser());
     this.app.use(router);
-
-    // Add development routes if in development environment
-    if (process.env.NODE_ENV === 'development') {
-      const { sampleExercises } = require('./mocks/exercise-mocks');
-      
-      this.app.get('/api/dev/create-sample-data', async (req, res) => {
-        try {
-          await Exercise.insertMany(sampleExercises);
-          res.json({ message: 'Sample data created successfully' });
-        } catch (error) {
-          console.error('Error creating sample data:', error);
-          res.status(500).json({ message: 'Error creating sample data' });
-        }
-      });
-    }
+    this.app.use(errorHandler);
+    
   }
-
   // Get the Socket.IO instance
   static getIO() {
     return Server.io;
