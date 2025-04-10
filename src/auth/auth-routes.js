@@ -161,7 +161,6 @@ router.post('/users/sync', async (req, res) => {
       return res.status(400).json({ message: 'Missing required user information' });
     }
 
-    // Find user by parentEmail (assuming OAuth uses parent's email)
     let user = await User.findOne({ email: email });
 
     if (user) {
@@ -193,10 +192,9 @@ router.post('/users/sync', async (req, res) => {
       // User not found, return success but indicate it's a new user
       return res.json({
         success: true,
+        needsRegistration: true,
         user: {
           email,
-          name,
-          isExistingUser: false
         }
       });
     }
