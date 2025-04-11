@@ -23,7 +23,7 @@ const userSchema = new mongoose.Schema({
     role: {
       type: String,
       enum: ['supervisor', 'student'],
-      default: 'supervisor'
+      default: 'student'
     },
     googleAuth: {
       type: Boolean,
@@ -66,6 +66,7 @@ const userSchema = new mongoose.Schema({
       }
     },
     numOfExercises: { type: Number, default: 3 },
+    stars: { type: Number, default: 0 }
   });
 
   registerNotificationEvents(modelName, userSchema)

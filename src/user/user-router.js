@@ -15,6 +15,14 @@ router
   });
 
 router
+  .route(`${BASE_PATH}/email/:email`)
+  .get((req, res, next) => {
+    User.findOne({ email: req.params.email })
+      .then((user) => res.send(user || undefined))
+      .catch(next);
+  });
+
+router
   .route(`${BASE_PATH}/:id`)
   // get one
   .get(authenticateToken, (req, res, next) => {

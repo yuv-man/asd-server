@@ -192,7 +192,6 @@ router.post('/users/sync', async (req, res) => {
       // User not found, return success but indicate it's a new user
       return res.json({
         success: true,
-        needsRegistration: true,
         user: {
           email,
         }
