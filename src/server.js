@@ -23,7 +23,7 @@ class Server {
     this.server = http.createServer(this.app);
     this.io = socketIO(this.server, {
       cors: {
-        origin: process.env.CLIENT_URL || 'http://localhost:3000',
+        origin: [process.env.CLIENT_URL , 'http://localhost:3000'],
         methods: ['GET', 'POST'],
         credentials: true
       }
