@@ -4,9 +4,10 @@ import bcrypt from 'bcrypt';
 import { User } from '../user/user-model.js';
 
 const router = express.Router();
+const BASE_PATH = '/api/auth';
 
 // Register endpoint
-router.post('/register', async (req, res) => {
+router.post(`${BASE_PATH}/register`, async (req, res) => {
   try {
     const { name,
       age,
@@ -153,7 +154,7 @@ router.get('/check-auth', async (req, res) => {
 });
 
 // User sync endpoint for NextAuth.js OAuth
-router.post('/users/sync', async (req, res) => {
+router.post(`${BASE_PATH}/sync`, async (req, res) => {
   try {
     const { email, name, providerId, provider } = req.body;
 
