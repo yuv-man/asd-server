@@ -8,9 +8,20 @@ const BASE_PATH = "/api/profile";
 router
   .route(BASE_PATH)
   // create new
+  
   .post((req, res, next) => {
-    User.create(req.body)
-      .then((user) => res.send(user))
+    User.findOne({ email: req.body.email })
+      .then(existingUser => {
+        if (existingUser) {
+          return res.status(400).json({ 
+            message: 'Email is already connected to an existing user' 
+          });
+        }
+        return User.create(req.body);
+      })
+      .then((user) => {
+        if (user) res.send(user);
+      })
       .catch(next);
   });
 

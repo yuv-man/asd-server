@@ -14,7 +14,7 @@ const exerciseAttemptSchema = new mongoose.Schema({
     area: {
       type: String,
       required: true,
-      enum: ["occupationalTherapy", "speechTherapy", "cognitive"]
+      enum: ["ot", "speech", "cognitive"]
     },
     isTest: { type: Boolean, default: false },
     metrics: {
